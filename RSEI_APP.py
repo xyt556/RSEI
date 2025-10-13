@@ -31,80 +31,62 @@ st.set_page_config(
 
 # ==================== 强力中文字体解决方案 ====================
 @st.cache_resource
+# ==================== 终极强力中文字体解决方案 v2 ====================
+@st.cache_resource
 def download_and_setup_chinese_font():
-    """下载并设置中文字体"""
+    """
+    下载并设置中文字体。优先使用国内CDN，增加备用链接，确保成功。
+    """
     font_dir = Path("./fonts")
     font_dir.mkdir(exist_ok=True)
-
     font_path = font_dir / "SimHei.ttf"
 
-    # 如果字体文件不存在，下载它
     if not font_path.exists():
-        try:
-            # 使用GitHub上的开源中文字体
-            font_urls = [
-                "https://github.com/StellarCN/scp_zh/raw/master/fonts/SimHei.ttf",
-                "https://raw.githubusercontent.com/dolbydu/font/master/unicode/Microsoft/Microsoft%20Yahei/Microsoft%20Yahei.ttf",
-                "https://github.com/google/fonts/raw/main/ofl/notosanssc/NotoSansSC-Regular.otf"
-            ]
+        st.info("首次运行，正在配置中文字体...")
 
-            downloaded = False
-            for url in font_urls:
-                try:
-                    st.info(f"正在下载中文字体...")
-                    urllib.request.urlretrieve(url, str(font_path))
-                    downloaded = True
-                    st.success("✅ 字体下载成功！")
+        # 优先使用国内CDN，备用GitHub
+        font_urls = [
+            "http://www.fonts.net.cn/Public/Uploads/2019-01-02/5c2c77f02f5a1.ttf",  # SimHei from fonts.net.cn
+            "https://github.com/StellarCN/scp_zh/raw/master/fonts/SimHei.ttf"  # GitHub backup
+        ]
+
+        download_success = False
+        for i, url in enumerate(font_urls, 1):
+            try:
+                with st.spinner(f"正在尝试从源 {i} 下载字体..."):
+                    urllib.request.urlretrieve(url, font_path)
+
+                if font_path.exists() and font_path.stat().st_size > 1000:  # 检查文件是否有效
+                    st.success(f"✅ 字体下载成功！")
+                    download_success = True
                     break
-                except Exception as e:
-                    continue
+            except Exception as e:
+                st.warning(f"⚠️ 从源 {i} 下载失败: {e}")
+                if font_path.exists():
+                    font_path.unlink()  # 删除不完整的文件
 
-            if not downloaded:
-                st.warning("⚠️ 字体下载失败，将使用系统默认字体")
-                return None
-        except Exception as e:
-            st.warning(f"⚠️ 字体下载失败: {str(e)}")
+        if not download_success:
+            st.error("❌ 所有字体下载源均失败。中文将无法正常显示。请检查网络连接或防火墙设置。")
             return None
 
     # 加载字体
     try:
-        # 添加字体到matplotlib
         fm.fontManager.addfont(str(font_path))
-
-        # 获取字体属性
         font_prop = fm.FontProperties(fname=str(font_path))
         font_name = font_prop.get_name()
 
-        # 设置matplotlib使用该字体
+        plt.rcParams['font.family'] = 'sans-serif'
         plt.rcParams['font.sans-serif'] = [font_name, 'DejaVu Sans', 'Arial']
         plt.rcParams['axes.unicode_minus'] = False
 
-        # 清除字体缓存
-        plt.rcParams['font.family'] = 'sans-serif'
-
-        st.success(f"✅ 字体加载成功: {font_name}")
-        return font_name
+        return f"✅ 字体 '{font_name}' 加载成功"
     except Exception as e:
-        st.error(f"❌ 字体加载失败: {str(e)}")
-
-        # 备用方案：尝试使用系统字体
-        try:
-            matplotlib.rc('font', family='sans-serif')
-            plt.rcParams['font.sans-serif'] = [
-                'WenQuanYi Micro Hei', 'Noto Sans CJK SC', 'Microsoft YaHei',
-                'SimHei', 'DejaVu Sans', 'Arial'
-            ]
-            plt.rcParams['axes.unicode_minus'] = False
-            st.info("ℹ️ 使用系统字体")
-        except:
-            pass
-
+        st.error(f"❌ 字体文件加载失败: {e}")
         return None
 
 
 # 初始化字体
-with st.spinner("正在配置中文字体..."):
-    font_status = download_and_setup_chinese_font()
+font_status = download_and_setup_chinese_font()
 
 
 # =============================
