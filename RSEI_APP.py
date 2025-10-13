@@ -619,8 +619,8 @@ def main():
             st.pyplot(fig)
             plt.close()
 
-        if selected_font:
-            st.success(f"✅ 字体配置成功！当前使用: **{selected_font}**")
+        if font_status:
+            st.success(f"✅ 字体配置成功！当前使用: **{font_status}**")
             st.info("如果上方图表中文显示正常，说明字体配置完美！")
         else:
             st.warning("⚠️ 未找到理想的中文字体，使用系统默认字体")
