@@ -46,7 +46,7 @@ def download_and_setup_chinese_font():
 
         # 优先使用国内CDN，备用GitHub
         font_urls = [
-            "http://www.fonts.net.cn/Public/Uploads/2019-01-02/5c2c77f02f5a1.ttf",  # SimHei from fonts.net.cn
+            # "http://www.fonts.net.cn/Public/Uploads/2019-01-02/5c2c77f02f5a1.ttf",  # SimHei from fonts.net.cn
             "https://github.com/StellarCN/scp_zh/raw/master/fonts/SimHei.ttf"  # GitHub backup
         ]
 
