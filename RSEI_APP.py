@@ -960,37 +960,6 @@ def display_results(result):
             for f in files:
                 st.write(f"  - {f.name}")
 
-#     下载：
-    # 下载区域（新增/修改这部分）
-    st.subheader("📥 结果文件下载")
-    st.success(f"文件存储路径: `{result['output_path'].absolute()}`")
-
-    # 获取目录下的所有文件
-    output_dir = result['output_path']
-    if output_dir.exists():
-        # 过滤出常见的结果文件（可根据实际生成的文件类型调整）
-        result_files = list(output_dir.glob('*.tif')) + list(output_dir.glob('*.txt')) + list(output_dir.glob('*.csv'))
-
-        if result_files:
-            st.write("可下载的文件:")
-            for file in result_files:
-                # 读取文件内容（二进制模式，适用于所有文件类型）
-                with open(file, "rb") as f:
-                    file_content = f.read()
-
-                # 创建下载按钮（文件名作为按钮文字，方便用户识别）
-                st.download_button(
-                    label=f"下载 {file.name}",
-                    data=file_content,
-                    file_name=file.name,  # 保存到本地的文件名
-                    mime="application/octet-stream",  # 通用二进制文件类型
-                    use_container_width=True
-                )
-        else:
-            st.info("⚠️ 该目录下暂无结果文件，请先运行计算生成结果。")
-    else:
-        st.error(f"❌ 目录不存在: {output_dir}")
-
 
 if __name__ == "__main__":
     main()
