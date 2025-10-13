@@ -17,6 +17,7 @@ from typing import Dict, Tuple, Optional
 from dataclasses import dataclass
 import warnings
 import os
+import urllib.request
 
 warnings.filterwarnings('ignore')
 
