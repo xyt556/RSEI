@@ -28,67 +28,82 @@ st.set_page_config(
 )
 
 
-# =============================
-# 中文字体配置
-# =============================
-def setup_chinese_font():
-    """配置中文字体显示"""
-    system = platform.system()
+# ==================== 强力中文字体解决方案 ====================
+@st.cache_resource
+def download_and_setup_chinese_font():
+    """下载并设置中文字体"""
+    font_dir = Path("./fonts")
+    font_dir.mkdir(exist_ok=True)
 
-    # 根据操作系统设置字体
-    if system == 'Windows':
-        font_list = ['Microsoft YaHei', 'SimHei', 'KaiTi', 'SimSun']
-    elif system == 'Darwin':  # macOS
-        font_list = ['PingFang SC', 'STHeiti', 'Arial Unicode MS', 'Heiti TC']
-    else:  # Linux (Streamlit Cloud通常是Linux)
-        font_list = ['WenQuanYi Micro Hei', 'Noto Sans CJK SC', 'Droid Sans Fallback', 'DejaVu Sans']
+    font_path = font_dir / "SimHei.ttf"
 
-    # 获取系统可用字体
+    # 如果字体文件不存在，下载它
+    if not font_path.exists():
+        try:
+            # 使用GitHub上的开源中文字体
+            font_urls = [
+                "https://github.com/StellarCN/scp_zh/raw/master/fonts/SimHei.ttf",
+                "https://raw.githubusercontent.com/dolbydu/font/master/unicode/Microsoft/Microsoft%20Yahei/Microsoft%20Yahei.ttf",
+                "https://github.com/google/fonts/raw/main/ofl/notosanssc/NotoSansSC-Regular.otf"
+            ]
+
+            downloaded = False
+            for url in font_urls:
+                try:
+                    st.info(f"正在下载中文字体...")
+                    urllib.request.urlretrieve(url, str(font_path))
+                    downloaded = True
+                    st.success("✅ 字体下载成功！")
+                    break
+                except Exception as e:
+                    continue
+
+            if not downloaded:
+                st.warning("⚠️ 字体下载失败，将使用系统默认字体")
+                return None
+        except Exception as e:
+            st.warning(f"⚠️ 字体下载失败: {str(e)}")
+            return None
+
+    # 加载字体
     try:
-        available_fonts = set([f.name for f in fm.fontManager.ttflist])
-    except:
-        available_fonts = set()
+        # 添加字体到matplotlib
+        fm.fontManager.addfont(str(font_path))
 
-    # 找到第一个可用的中文字体
-    selected_font = None
-    for font in font_list:
-        if font in available_fonts:
-            selected_font = font
-            break
+        # 获取字体属性
+        font_prop = fm.FontProperties(fname=str(font_path))
+        font_name = font_prop.get_name()
 
-    # 如果没有找到，尝试查找包含中文关键词的字体
-    if selected_font is None and available_fonts:
-        for font in available_fonts:
-            if any(keyword in font.lower() for keyword in
-                   ['chinese', 'cjk', 'sc', 'cn', 'hei', 'kai', 'song', 'yahei']):
-                selected_font = font
-                break
+        # 设置matplotlib使用该字体
+        plt.rcParams['font.sans-serif'] = [font_name, 'DejaVu Sans', 'Arial']
+        plt.rcParams['axes.unicode_minus'] = False
 
-    # 设置matplotlib参数
-    if selected_font:
-        plt.rcParams['font.sans-serif'] = [selected_font] + font_list
-    else:
-        plt.rcParams['font.sans-serif'] = font_list
+        # 清除字体缓存
+        plt.rcParams['font.family'] = 'sans-serif'
 
-    plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
+        st.success(f"✅ 字体加载成功: {font_name}")
+        return font_name
+    except Exception as e:
+        st.error(f"❌ 字体加载失败: {str(e)}")
 
-    # 设置字体大小
-    plt.rcParams['font.size'] = 10
-    plt.rcParams['axes.titlesize'] = 12
-    plt.rcParams['axes.labelsize'] = 11
-    plt.rcParams['xtick.labelsize'] = 10
-    plt.rcParams['ytick.labelsize'] = 10
-    plt.rcParams['legend.fontsize'] = 10
+        # 备用方案：尝试使用系统字体
+        try:
+            matplotlib.rc('font', family='sans-serif')
+            plt.rcParams['font.sans-serif'] = [
+                'WenQuanYi Micro Hei', 'Noto Sans CJK SC', 'Microsoft YaHei',
+                'SimHei', 'DejaVu Sans', 'Arial'
+            ]
+            plt.rcParams['axes.unicode_minus'] = False
+            st.info("ℹ️ 使用系统字体")
+        except:
+            pass
 
-    return selected_font
+        return None
 
 
 # 初始化字体
-try:
-    selected_font = setup_chinese_font()
-    font_status = f"✅ 字体: {selected_font}" if selected_font else "⚠️ 使用默认字体"
-except Exception as e:
-    font_status = f"⚠️ 字体设置警告: {str(e)}"
+with st.spinner("正在配置中文字体..."):
+    font_status = download_and_setup_chinese_font()
 
 
 # =============================
