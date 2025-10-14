@@ -24,39 +24,10 @@ import os
 warnings.filterwarnings('ignore')
 
 # =============================
-# 文件大小限制配置 - 设置为50MB
+# 文件大小限制配置
 # =============================
-MAX_FILE_SIZE_MB = 50  # 最大文件大小50MB
+MAX_FILE_SIZE_MB = 100  # 最大文件大小（MB）
 MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
-
-
-def check_file_size(uploaded_file):
-    """检查上传文件大小是否超过限制"""
-    if uploaded_file is None:
-        return False
-
-    file_size = len(uploaded_file.getvalue())
-
-    if file_size > MAX_FILE_SIZE_BYTES:
-        st.error(f"❌ 文件太大！")
-        st.error(f"最大支持: {MAX_FILE_SIZE_MB} MB")
-        st.error(f"当前文件: {file_size / (1024 * 1024):.2f} MB")
-        st.error("请上传较小的文件或联系管理员调整限制")
-        return False
-    return True
-
-
-def format_file_size(size_bytes):
-    """格式化文件大小显示"""
-    if size_bytes >= 1024 * 1024 * 1024:
-        return f"{size_bytes / (1024 * 1024 * 1024):.2f} GB"
-    elif size_bytes >= 1024 * 1024:
-        return f"{size_bytes / (1024 * 1024):.2f} MB"
-    elif size_bytes >= 1024:
-        return f"{size_bytes / 1024:.2f} KB"
-    else:
-        return f"{size_bytes} B"
-
 
 # =============================
 # 中文字体配置
@@ -100,8 +71,9 @@ def setup_chinese_font_enhanced():
 
 try:
     detected_font = setup_chinese_font_enhanced()
+    print(f"✓ 使用字体: {detected_font}")
 except Exception as e:
-    print(f"字体设置失败: {e}")
+    print(f"✗ 字体设置失败: {e}")
 
 st.set_page_config(
     page_title="RSEI计算系统",
@@ -150,6 +122,7 @@ class JenksNaturalBreaks:
             indices = np.random.choice(len(valid_data), max_samples, replace=False)
             valid_data = valid_data[indices]
 
+        # 使用简化的方法
         sorted_data = np.sort(valid_data)
         n = len(sorted_data)
         breaks = []
@@ -857,19 +830,11 @@ def main():
     st.title("🌿 RSEI计算系统 v4.0 - 完整版")
     st.markdown("**Remote Sensing based Ecological Index 遥感生态指数计算工具**")
 
-    # 显示文件大小限制信息
-    st.sidebar.markdown("---")
-    st.sidebar.info(f"📏 **文件大小限制**: 最大 {MAX_FILE_SIZE_MB} MB")
-
     with st.sidebar:
         st.header("⚙️ 参数配置")
 
         st.subheader("📁 文件上传")
-        uploaded_file = st.file_uploader(
-            f"选择多波段TIF影像 (最大 {MAX_FILE_SIZE_MB} MB)",
-            type=['tif', 'tiff'],
-            help=f"请上传不超过 {MAX_FILE_SIZE_MB} MB 的TIFF文件"
-        )
+        uploaded_file = st.file_uploader("选择多波段TIF影像", type=['tif', 'tiff'])
 
         st.subheader("🛰️ 卫星参数")
         satellite = st.selectbox("卫星类型", ["Landsat8", "Sentinel2"], index=0)
@@ -912,19 +877,6 @@ def main():
 
     # 处理文件上传和计算
     if uploaded_file is not None:
-        # 检查文件大小 - 这是核心限制逻辑
-        if not check_file_size(uploaded_file):
-            st.stop()  # 停止执行后续代码
-
-        # 显示文件信息
-        file_size = len(uploaded_file.getvalue())
-        st.success(f"✅ 文件已上传: {uploaded_file.name}")
-        st.info(f"📦 文件大小: {format_file_size(file_size)}")
-
-        # 进度条显示文件大小使用情况
-        usage_percent = min(100, (file_size / MAX_FILE_SIZE_BYTES) * 100)
-        st.progress(usage_percent / 100, text=f"存储使用: {usage_percent:.1f}%")
-
         # 保存上传的文件到会话状态
         if (st.session_state.uploaded_file != uploaded_file.name or
                 st.session_state.tmp_file_path is None):
@@ -938,6 +890,10 @@ def main():
                 st.session_state.tmp_file_path = tmp_file.name
 
         tmp_file_path = st.session_state.tmp_file_path
+
+        st.success(f"✅ 文件已上传: {uploaded_file.name}")
+        file_size = len(uploaded_file.getvalue()) / (1024 * 1024)
+        st.info(f"📦 文件大小: {file_size:.2f} MB")
 
         # 计算当前参数哈希
         current_params_hash = calculate_params_hash(
@@ -1127,31 +1083,24 @@ def main():
     else:
         st.info("👈 请在左侧上传多波段TIF影像文件开始计算")
 
-        # 显示系统限制信息
-        st.markdown("---")
         col1, col2 = st.columns(2)
         with col1:
-            st.markdown(f"""
+            st.markdown("""
             ### 🌟 功能特点
             - ✅ 支持 Landsat 8 和 Sentinel-2
             - ✅ 自动水体掩膜（OTSU阈值）
             - ✅ Jenks自然间断点分类
             - ✅ 完整的可视化分析
             - ✅ 一键打包下载
-            - 📏 文件限制: {MAX_FILE_SIZE_MB} MB
             """)
 
         with col2:
-            st.markdown(f"""
+            st.markdown("""
             ### 📊 输出结果
             - 🎯 RSEI连续值/分类影像
             - 🖼️ 综合可视化图
             - 📈 Excel统计报告
             - 🌱 10+遥感指数
-            ### ⚠️ 注意事项
-            - 请确保TIFF文件包含所有必要波段
-            - 文件大小不超过 {MAX_FILE_SIZE_MB} MB
-            - 计算时间取决于文件大小和计算机性能
             """)
 
 
