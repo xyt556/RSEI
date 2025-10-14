@@ -26,7 +26,7 @@ warnings.filterwarnings('ignore')
 # =============================
 # 文件大小限制配置 - 设置为50MB
 # =============================
-MAX_FILE_SIZE_MB = 20  # 最大文件大小50MB
+MAX_FILE_SIZE_MB = 10  # 最大文件大小50MB
 MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 
 
