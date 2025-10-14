@@ -790,8 +790,12 @@ def execute_rsei_calculation(input_file, config):
 # GUI主程序
 # =============================
 def main():
-    st.title("🌿 RSEI计算系统 v4.0 - 完整版")
+    st.title("🌿 RSEI计算系统 v4.1 - 状态保持修复版")
     st.markdown("**Remote Sensing based Ecological Index 遥感生态指数计算工具**")
+
+    # 初始化 session_state
+    if 'results' not in st.session_state:
+        st.session_state['results'] = None
 
     with st.sidebar:
         st.header("⚙️ 参数配置")
@@ -872,135 +876,101 @@ def main():
 
             with st.spinner("计算中，请稍候..."):
                 results = execute_rsei_calculation(tmp_file_path, config)
+                st.session_state['results'] = results  # 保存结果到session_state
 
             elapsed_time = time.time() - start_time
 
             if results:
                 st.success(f"✅ 计算完成！耗时: {elapsed_time:.1f}秒")
-                st.header("📊 计算结果")
+                # 强制重新运行以显示结果
+                st.experimental_rerun()
+            else:
+                st.error("计算失败，请检查参数和文件")
+                st.session_state['results'] = None
 
-                tab1, tab2, tab3, tab4, tab5 = st.tabs([
-                    "📈 统计数据",
-                    "🖼️ 可视化结果",
-                    "📥 下载文件",
-                    "📋 文件清单",
-                    "ℹ️ 详细信息"
-                ])
+    # 从 session_state 恢复结果并显示
+    if st.session_state['results']:
+        results = st.session_state['results']
 
-                with tab1:
-                    st.subheader("指标统计")
-                    st.dataframe(results['stats_df'], use_container_width=True)
-                    st.subheader("等级分布")
-                    st.dataframe(results['class_df'], use_container_width=True)
-                    st.subheader("分类阈值")
-                    st.dataframe(results['threshold_df'], use_container_width=True)
+        st.header("📊 计算结果")
 
-                with tab2:
-                    st.subheader("RSEI综合分析可视化")
-                    st.image(results['img_path'], use_container_width=True)  # ✅ 修复
-                    st.success("✅ 可视化已生成！")
+        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+            "📈 统计数据",
+            "🖼️ 可视化结果",
+            "📥 下载文件",
+            "📋 文件清单",
+            "ℹ️ 详细信息"
+        ])
 
-                with tab3:
-                    st.subheader("下载结果文件")
-                    col1, col2 = st.columns(2)
+        with tab1:
+            st.subheader("指标统计")
+            st.dataframe(results['stats_df'], use_container_width=True)
+            st.subheader("等级分布")
+            st.dataframe(results['class_df'], use_container_width=True)
+            st.subheader("分类阈值")
+            st.dataframe(results['threshold_df'], use_container_width=True)
 
-                    with col1:
-                        with open(results['img_path'], 'rb') as f:
-                            st.download_button(
-                                "📷 下载可视化图",
-                                f,
-                                "RSEI_comprehensive.png",
-                                "image/png",
-                                use_container_width=True
-                            )
+        with tab2:
+            st.subheader("RSEI综合分析可视化")
+            st.image(results['img_path'], use_container_width=True)
 
-                    with col2:
-                        with open(results['excel_path'], 'rb') as f:
-                            st.download_button(
-                                "📊 下载统计报告",
-                                f,
-                                "RSEI_analysis.xlsx",
-                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                use_container_width=True
-                            )
+        with tab3:
+            st.subheader("下载结果文件")
+            col1, col2 = st.columns(2)
 
-                    st.markdown("---")
+            with col1:
+                with open(results['img_path'], 'rb') as f:
+                    st.download_button(
+                        "📷 下载可视化图",
+                        f,
+                        "RSEI_comprehensive.png",
+                        "image/png",
+                        use_container_width=True
+                    )
 
-                    if export_geotiff:
-                        st.subheader("📦 打包下载")
-                        zip_buffer = io.BytesIO()
-                        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-                            output_path = results['output_path']
-                            for file in output_path.glob('*'):
-                                zip_file.write(file, file.name)
+            with col2:
+                with open(results['excel_path'], 'rb') as f:
+                    st.download_button(
+                        "📊 下载统计报告",
+                        f,
+                        "RSEI_analysis.xlsx",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True
+                    )
 
-                            readme = f"""RSEI计算结果
+            st.markdown("---")
 
-计算时间: {time.strftime('%Y-%m-%d %H:%M:%S')}
-卫星类型: {config.satellite}
-分类方法: {'Jenks自然间断点' if config.use_jenks else '手动设置'}
+            if results['saved_files']:
+                st.subheader("📦 打包下载")
+                zip_buffer = io.BytesIO()
+                with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                    output_path = results['output_path']
+                    for file in output_path.glob('*'):
+                        zip_file.write(file, file.name)
 
-包含文件:
-- RSEI.tif: RSEI连续值（0-1）
-- RSEI_classified.tif: RSEI分类（1-5）
-- RSEI_comprehensive.png: 综合可视化图
-- RSEI_analysis.xlsx: 统计报告
-- 其他遥感指数TIF文件
+                    readme = f"""RSEI计算结果"""
+                    zip_file.writestr('README.txt', readme.encode('utf-8'))
 
-详见Excel文件"文件清单"工作表。
-"""
-                            zip_file.writestr('README.txt', readme.encode('utf-8'))
+                zip_size = len(zip_buffer.getvalue()) / (1024 * 1024)
 
-                        zip_size = len(zip_buffer.getvalue()) / (1024 * 1024)
+                st.download_button(
+                    f"📦 下载所有结果 - {zip_size:.2f} MB",
+                    zip_buffer.getvalue(),
+                    f"RSEI_results_{time.strftime('%Y%m%d_%H%M%S')}.zip",
+                    "application/zip",
+                    use_container_width=True
+                )
 
-                        st.download_button(
-                            f"📦 下载所有结果 - {zip_size:.2f} MB",
-                            zip_buffer.getvalue(),
-                            f"RSEI_results_{time.strftime('%Y%m%d_%H%M%S')}.zip",
-                            "application/zip",
-                            use_container_width=True
-                        )
+        with tab4:
+            st.subheader("输出文件清单")
+            st.dataframe(results['files_df'], use_container_width=True)
 
-                with tab4:
-                    st.subheader("输出文件清单")
-                    st.dataframe(results['files_df'], use_container_width=True)
-                    st.info(f"共生成 {len(results['saved_files'])} 个文件")
-
-                with tab5:
-                    st.subheader("计算详情")
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.metric("卫星类型", config.satellite)
-                        st.metric("总耗时", f"{elapsed_time:.1f}秒")
-                    with col2:
-                        st.metric("分类方法", 'Jenks' if config.use_jenks else '手动')
-                        st.metric("文件数", len(results['saved_files']))
-
-                    st.markdown("---")
-                    st.write("**分类阈值:**", [f'{b:.4f}' for b in results['classification_breaks']])
+        with tab5:
+            st.subheader("计算详情")
+            st.write(f"**卫星类型:** {results['stats_df'].iloc[0, 0]}")
 
     else:
         st.info("👈 请在左侧上传多波段TIF影像文件开始计算")
-
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown("""
-            ### 🌟 功能特点
-            - ✅ 支持 Landsat 8 和 Sentinel-2
-            - ✅ 自动水体掩膜（OTSU阈值）
-            - ✅ Jenks自然间断点分类
-            - ✅ 完整的可视化分析
-            - ✅ 一键打包下载
-            """)
-
-        with col2:
-            st.markdown("""
-            ### 📊 输出结果
-            - 🎯 RSEI连续值/分类影像
-            - 🖼️ 综合可视化图
-            - 📈 Excel统计报告
-            - 🌱 10+遥感指数
-            """)
 
 
 if __name__ == "__main__":
