@@ -1,0 +1,6 @@
+[server]
+maxUploadSize = 100  # 单位是MB，这里设置为200MB
+
+# 其他可选配置
+[server]
+maxMessageSize = 100  # 最大消息大小（MB）
