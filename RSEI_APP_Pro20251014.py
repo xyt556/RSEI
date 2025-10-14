@@ -973,7 +973,7 @@ def main():
             ```
             """)
 
-    st.title("🌿 RSEI计算系统 v3.9 - 修复版")
+    st.title("🌿 RSEI计算系统 v3.9")
     st.markdown("**Remote Sensing based Ecological Index 遥感生态指数计算工具**")
 
     # 其余界面代码保持不变...
