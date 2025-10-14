@@ -91,6 +91,10 @@ def initialize_session_state():
         st.session_state.uploaded_file = None
     if 'config' not in st.session_state:
         st.session_state.config = None
+    if 'current_params_hash' not in st.session_state:
+        st.session_state.current_params_hash = None
+    if 'tmp_file_path' not in st.session_state:
+        st.session_state.tmp_file_path = None
 
 
 initialize_session_state()
@@ -804,6 +808,16 @@ def execute_rsei_calculation(input_file, config):
         return None
 
 
+def calculate_params_hash(satellite, use_pca, use_jenks, jenks_samples,
+                          threshold_1, threshold_2, threshold_3, threshold_4,
+                          mask_water, water_index, use_otsu, water_threshold,
+                          export_geotiff, export_indices):
+    """计算参数哈希值，用于检测参数是否改变"""
+    import hashlib
+    params_str = f"{satellite}_{use_pca}_{use_jenks}_{jenks_samples}_{threshold_1}_{threshold_2}_{threshold_3}_{threshold_4}_{mask_water}_{water_index}_{use_otsu}_{water_threshold}_{export_geotiff}_{export_indices}"
+    return hashlib.md5(params_str.encode()).hexdigest()
+
+
 # =============================
 # GUI主程序
 # =============================
@@ -859,21 +873,53 @@ def main():
     # 处理文件上传和计算
     if uploaded_file is not None:
         # 保存上传的文件到会话状态
-        if st.session_state.uploaded_file != uploaded_file.name:
+        if (st.session_state.uploaded_file != uploaded_file.name or
+                st.session_state.tmp_file_path is None):
             st.session_state.uploaded_file = uploaded_file.name
             st.session_state.calculation_complete = False
             st.session_state.results = None
 
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.tif') as tmp_file:
-            tmp_file.write(uploaded_file.getvalue())
-            tmp_file_path = tmp_file.name
+            # 保存临时文件路径
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.tif') as tmp_file:
+                tmp_file.write(uploaded_file.getvalue())
+                st.session_state.tmp_file_path = tmp_file.name
+
+        tmp_file_path = st.session_state.tmp_file_path
 
         st.success(f"✅ 文件已上传: {uploaded_file.name}")
         file_size = len(uploaded_file.getvalue()) / (1024 * 1024)
         st.info(f"📦 文件大小: {file_size:.2f} MB")
 
+        # 计算当前参数哈希
+        current_params_hash = calculate_params_hash(
+            satellite, use_pca, use_jenks, jenks_samples,
+            threshold_1, threshold_2, threshold_3, threshold_4,
+            mask_water, water_index, use_otsu, water_threshold,
+            export_geotiff, export_indices
+        )
+
+        # 检查参数是否改变
+        params_changed = (st.session_state.current_params_hash != current_params_hash)
+
+        # 如果参数改变，重置计算状态
+        if params_changed:
+            st.session_state.current_params_hash = current_params_hash
+            st.session_state.calculation_complete = False
+            st.session_state.results = None
+
+        # 显示重新计算提示
+        if params_changed and st.session_state.results is not None:
+            st.warning("🔧 检测到参数改变，点击'开始计算'按钮重新计算")
+
         # 开始计算按钮
-        if st.button("▶️ 开始计算", type="primary") or st.session_state.calculation_complete:
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            calculate_clicked = st.button("▶️ 开始计算", type="primary", use_container_width=True)
+        with col2:
+            if st.session_state.calculation_complete:
+                st.success("✅ 计算完成")
+
+        if calculate_clicked or st.session_state.calculation_complete:
             if not use_jenks:
                 thresholds = [threshold_1, threshold_2, threshold_3, threshold_4]
                 if not all(thresholds[i] < thresholds[i + 1] for i in range(3)):
@@ -897,8 +943,8 @@ def main():
             # 保存配置到会话状态
             st.session_state.config = config
 
-            # 如果还没有计算结果，执行计算
-            if not st.session_state.calculation_complete:
+            # 如果还没有计算结果或参数改变，执行计算
+            if not st.session_state.calculation_complete or params_changed:
                 start_time = time.time()
 
                 with st.spinner("计算中，请稍候..."):
