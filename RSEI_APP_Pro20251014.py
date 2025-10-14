@@ -79,6 +79,24 @@ st.set_page_config(
 
 
 # =============================
+# 会话状态初始化
+# =============================
+def initialize_session_state():
+    """初始化会话状态"""
+    if 'calculation_complete' not in st.session_state:
+        st.session_state.calculation_complete = False
+    if 'results' not in st.session_state:
+        st.session_state.results = None
+    if 'uploaded_file' not in st.session_state:
+        st.session_state.uploaded_file = None
+    if 'config' not in st.session_state:
+        st.session_state.config = None
+
+
+initialize_session_state()
+
+
+# =============================
 # 核心计算类
 # =============================
 class JenksNaturalBreaks:
@@ -838,7 +856,14 @@ def main():
         export_geotiff = st.checkbox("导出GeoTIFF文件", value=True)
         export_indices = st.checkbox("导出所有遥感指数", value=True)
 
+    # 处理文件上传和计算
     if uploaded_file is not None:
+        # 保存上传的文件到会话状态
+        if st.session_state.uploaded_file != uploaded_file.name:
+            st.session_state.uploaded_file = uploaded_file.name
+            st.session_state.calculation_complete = False
+            st.session_state.results = None
+
         with tempfile.NamedTemporaryFile(delete=False, suffix='.tif') as tmp_file:
             tmp_file.write(uploaded_file.getvalue())
             tmp_file_path = tmp_file.name
@@ -847,7 +872,8 @@ def main():
         file_size = len(uploaded_file.getvalue()) / (1024 * 1024)
         st.info(f"📦 文件大小: {file_size:.2f} MB")
 
-        if st.button("▶️ 开始计算", type="primary"):
+        # 开始计算按钮
+        if st.button("▶️ 开始计算", type="primary") or st.session_state.calculation_complete:
             if not use_jenks:
                 thresholds = [threshold_1, threshold_2, threshold_3, threshold_4]
                 if not all(thresholds[i] < thresholds[i + 1] for i in range(3)):
@@ -868,15 +894,39 @@ def main():
                 jenks_samples=jenks_samples
             )
 
-            start_time = time.time()
+            # 保存配置到会话状态
+            st.session_state.config = config
 
-            with st.spinner("计算中，请稍候..."):
-                results = execute_rsei_calculation(tmp_file_path, config)
+            # 如果还没有计算结果，执行计算
+            if not st.session_state.calculation_complete:
+                start_time = time.time()
 
-            elapsed_time = time.time() - start_time
+                with st.spinner("计算中，请稍候..."):
+                    results = execute_rsei_calculation(tmp_file_path, config)
 
-            if results:
+                elapsed_time = time.time() - start_time
+
+                if results:
+                    st.session_state.results = results
+                    st.session_state.calculation_complete = True
+                    st.session_state.elapsed_time = elapsed_time
+
+                    # 显示成功消息
+                    st.success(f"✅ 计算完成！耗时: {elapsed_time:.1f}秒")
+
+                    # 使用rerun来刷新页面，显示结果
+                    st.rerun()
+            else:
+                # 如果已经有计算结果，直接显示
+                results = st.session_state.results
+                elapsed_time = st.session_state.elapsed_time
+
                 st.success(f"✅ 计算完成！耗时: {elapsed_time:.1f}秒")
+
+            # 显示结果（无论是否重新计算）
+            if st.session_state.calculation_complete and st.session_state.results:
+                results = st.session_state.results
+
                 st.header("📊 计算结果")
 
                 tab1, tab2, tab3, tab4, tab5 = st.tabs([
@@ -897,7 +947,7 @@ def main():
 
                 with tab2:
                     st.subheader("RSEI综合分析可视化")
-                    st.image(results['img_path'], use_container_width=True)  # ✅ 修复
+                    st.image(results['img_path'], use_container_width=True)
                     st.success("✅ 可视化已生成！")
 
                 with tab3:
@@ -926,7 +976,7 @@ def main():
 
                     st.markdown("---")
 
-                    if export_geotiff:
+                    if st.session_state.config.export_geotiff:
                         st.subheader("📦 打包下载")
                         zip_buffer = io.BytesIO()
                         with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
@@ -937,8 +987,8 @@ def main():
                             readme = f"""RSEI计算结果
 
 计算时间: {time.strftime('%Y-%m-%d %H:%M:%S')}
-卫星类型: {config.satellite}
-分类方法: {'Jenks自然间断点' if config.use_jenks else '手动设置'}
+卫星类型: {st.session_state.config.satellite}
+分类方法: {'Jenks自然间断点' if st.session_state.config.use_jenks else '手动设置'}
 
 包含文件:
 - RSEI.tif: RSEI连续值（0-1）
@@ -970,10 +1020,10 @@ def main():
                     st.subheader("计算详情")
                     col1, col2 = st.columns(2)
                     with col1:
-                        st.metric("卫星类型", config.satellite)
+                        st.metric("卫星类型", st.session_state.config.satellite)
                         st.metric("总耗时", f"{elapsed_time:.1f}秒")
                     with col2:
-                        st.metric("分类方法", 'Jenks' if config.use_jenks else '手动')
+                        st.metric("分类方法", 'Jenks' if st.session_state.config.use_jenks else '手动')
                         st.metric("文件数", len(results['saved_files']))
 
                     st.markdown("---")
