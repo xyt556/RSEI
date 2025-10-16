@@ -30,6 +30,63 @@ MAX_FILE_SIZE_MB = 20  # 最大文件大小50MB
 MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 
 
+def configure_chinese_fonts():
+    """配置matplotlib中文字体"""
+    import platform
+
+    system = platform.system()
+    chinese_fonts = []
+
+    if system == 'Windows':
+        chinese_fonts = ['Microsoft YaHei', 'SimHei', 'SimSun', 'KaiTi', 'FangSong']
+    elif system == 'Darwin':
+        chinese_fonts = ['PingFang SC', 'Heiti SC', 'STHeiti', 'Arial Unicode MS']
+    else:
+        chinese_fonts = ['WenQuanYi Micro Hei', 'WenQuanYi Zen Hei', 'Droid Sans Fallback', 'DejaVu Sans']
+
+    from matplotlib.font_manager import FontManager
+    fm = FontManager()
+    available_fonts = {f.name for f in fm.ttflist}
+
+    selected_font = None
+    for font in chinese_fonts:
+        if font in available_fonts:
+            selected_font = font
+            break
+
+    if selected_font is None:
+        for font in available_fonts:
+            if any(keyword in font.lower() for keyword in ['chinese', 'cjk', 'han', 'hei', 'song']):
+                selected_font = font
+                break
+
+    if selected_font:
+        plt.rcParams['font.sans-serif'] = [selected_font]
+        plt.rcParams['axes.unicode_minus'] = False
+        return True, selected_font
+    else:
+        return False, None
+
+
+CHINESE_SUPPORT, SELECTED_FONT = configure_chinese_fonts()
+
+# 尝试导入依赖
+try:
+    from numba import jit, prange
+
+    NUMBA_AVAILABLE = True
+except ImportError:
+    NUMBA_AVAILABLE = False
+
+try:
+    import skfuzzy as fuzz
+
+    FUZZY_AVAILABLE = True
+except ImportError:
+    FUZZY_AVAILABLE = False
+
+warnings.filterwarnings('ignore')
+
 def check_file_size(uploaded_file):
     """检查上传文件大小是否超过限制"""
     if uploaded_file is None:

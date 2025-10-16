@@ -1,0 +1,4 @@
+fonts-noto-cjk
+libfreetype6-dev
+libharfbuzz-dev
+libffi-dev
